@@ -52,7 +52,43 @@ function populateAccountDropdowns() {
 }
 function getAccountsByRep(rep) {
   if (!rep) return [];
-  const accounts = trackerData.podBob.filter(row => same(getField(row, ["PREMISE", "Premise"]), "OFF") && same(getField(row, ["Sales Person"]), rep)).map(row => getField(row, ["Customer"])).filter(Boolean);
+
+  let accountRows = trackerData.podBob.filter(row => {
+    const rowRep = getField(row, ["Sales Person", "SalesPerson", "Sales Rep"]);
+    const rowPremise = getField(row, ["PREMISE", "Premise"]);
+    const rowTeam = getField(row, ["Team"]);
+
+    return (
+      same(rowRep, rep) &&
+      isOffPremise(rowPremise)
+    );
+  });
+
+  // Fallback 1: if rep match fails, try Team + OFF.
+  if (!accountRows.length && state.team) {
+    accountRows = trackerData.podBob.filter(row => {
+      const rowTeam = getField(row, ["Team"]);
+      const rowPremise = getField(row, ["PREMISE", "Premise"]);
+
+      return (
+        same(rowTeam, state.team) &&
+        isOffPremise(rowPremise)
+      );
+    });
+  }
+
+  // Fallback 2: if premise values are blank or inconsistent, use rep only.
+  if (!accountRows.length) {
+    accountRows = trackerData.podBob.filter(row => {
+      const rowRep = getField(row, ["Sales Person", "SalesPerson", "Sales Rep"]);
+      return same(rowRep, rep);
+    });
+  }
+
+  const accounts = accountRows
+    .map(row => getField(row, ["Customer", "Account", "Customer Name"]))
+    .filter(Boolean);
+
   return uniqueSorted(accounts);
 }
 function renderReport() {
@@ -89,7 +125,10 @@ function renderAccountBreakdowns() {
   section.innerHTML = `<div class="report-section"><div class="section-title">Account POD Details</div>${accounts.map(account => renderAccountCard(account)).join("")}</div>`;
 }
 function renderAccountCard(account) {
-  const rows = trackerData.podBob.filter(row => same(getField(row, ["Customer"]), account) && same(getField(row, ["PREMISE", "Premise"]), "OFF"));
+  const rows = trackerData.podBob.filter(row =>
+    same(getField(row, ["Customer", "Account", "Customer Name"]), account) &&
+    isOffPremise(getField(row, ["PREMISE", "Premise"]))
+  );
   const detailRows = rows.map(row => ({ brandGroup: getField(row, ["Brand Group"]), brand: getField(row, ["Brand"]), pods: getField(row, ["PODs"]) })).filter(row => row.brandGroup || row.brand || row.pods);
   if (!detailRows.length) return `<div class="account-card"><h3>${escapeHtml(account)}</h3><p class="empty">No account-level POD detail found for this account.</p></div>`;
   return `<div class="account-card"><h3>${escapeHtml(account)}</h3><div class="table-wrap"><table><thead><tr><th>Brand Group</th><th>Brand</th><th class="numeric">PODs</th></tr></thead><tbody>${detailRows.map(row => `<tr><td>${escapeHtml(row.brandGroup)}</td><td>${escapeHtml(row.brand)}</td><td class="numeric">${formatNumber(row.pods)}</td></tr>`).join("")}</tbody></table></div></div>`;
@@ -107,6 +146,15 @@ function percent(actual, goal) { const a = Number(actual || 0), g = Number(goal 
 function uniqueSorted(values) { return [...new Set(values.map(v => String(v || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)); }
 function normalizeKey(value) { return String(value || "").toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9]/g, ""); }
 function same(a, b) { return String(a || "").trim().toUpperCase() === String(b || "").trim().toUpperCase(); }
+function isOffPremise(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+
+  return (
+    normalized === "OFF" ||
+    normalized === "OFF PREMISE" ||
+    normalized.includes("OFF")
+  );
+}
 function formatNumber(value) { const number = Number(value || 0); if (!Number.isFinite(number)) return ""; return number.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function formatPercent(value) { if (value === null || value === undefined || value === "") return ""; return Number(value).toLocaleString(undefined, { style: "percent", maximumFractionDigits: 1 }); }
 function setStatus(message, isError = false) { const el = document.getElementById("uploadStatus"); el.textContent = message; el.style.color = isError ? "var(--danger)" : "var(--muted)"; }
