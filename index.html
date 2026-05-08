@@ -8,17 +8,11 @@
 </head>
 <body>
   <main class="app-shell">
-    <section class="hero">
+    <section class="hero hero-single">
       <div>
         <p class="eyebrow">MNY BDM Tracker</p>
         <h1>Off Premise Tracker</h1>
         <p class="subtitle">Start by selecting a BDM, Team, or Sales Person. Tracker data loads only after your selection, so the page stays fast.</p>
-      </div>
-      <div class="data-card">
-        <label>Google Sheets Database</label>
-        <p class="status-text">Required tabs: BDM Alignment, POD_Flat, POD_BOB_MNY, Display_Flat, and Display_BOB.</p>
-        <button id="refreshAlignmentBtn">Refresh Alignment</button>
-        <p id="uploadStatus" class="status-text">Ready to load alignment data.</p>
       </div>
     </section>
 
@@ -36,6 +30,16 @@
         <label>Sales Person<select id="repSelect"><option value="">Select Sales Person</option></select></label>
       </div>
       <p id="selectionHint" class="hint-text">Load alignment data, then make a selection.</p>
+      <div id="loadingBarWrap" class="loading-bar-wrap hidden">
+        <div class="loading-bar-header">
+          <span id="loadingText">Loading tracker data...</span>
+          <span id="loadingPercent">0%</span>
+        </div>
+      
+        <div class="loading-track">
+          <div id="loadingBar" class="loading-bar"></div>
+        </div>
+      </div>
     </section>
 
     <section class="panel">
