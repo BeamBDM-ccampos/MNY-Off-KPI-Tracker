@@ -1,4 +1,4 @@
-const APPS_SCRIPT_URL = "PASTE_YOUR_DEPLOYED_APPS_SCRIPT_WEB_APP_URL_HERE";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvZTzG5xxwFteaho9KUtS7X5yylbtjxBtpSx99IHVYWuZ-12NUQDADdB3jA4CgffIt/exec";
 
 let alignmentData = [];
 let trackerData = { podFlat: [], podBob: [], displayFlat: [], displayBob: [] };
