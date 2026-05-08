@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAlignmentData().catch(err => setStatus("Error loading alignment data: " + err.message, true));
 });
 
+window.addEventListener("beforeprint", updatePrintSelectionSummary);
+
 function bindEvents() {
   const loadTrackerBtn = document.getElementById("loadTrackerBtn");
   const refreshTrackerBtn = document.getElementById("refreshTrackerBtn");
@@ -360,13 +362,24 @@ function getAccountsByLoadedContext() {
 }
 
 function renderReport() {
+  const subtitle = document.getElementById("reportSubTitle");
+
   const parts = [];
   if (state.bdm) parts.push(`BDM: ${state.bdm}`);
   if (state.team) parts.push(`Team: ${state.team}`);
   if (state.rep) parts.push(`Sales Person: ${state.rep}`);
-  document.getElementById("reportSubTitle").textContent = parts.length ? parts.join(" • ") : "Select BDM, Team, or Sales Person, then load tracker data.";
-  renderPodBtg(); renderDisplayBtg(); renderAccountBreakdowns(); renderDisplayAccountDetails();
+
+  subtitle.textContent = parts.length
+    ? parts.join(" • ")
+    : "Select BDM, Team, or Sales Person, then load tracker data.";
+
+  renderPodBtg();
+  renderDisplayBtg();
+  renderAccountBreakdowns();
+  renderDisplayAccountDetails();
+  updatePrintSelectionSummary();
 }
+
 function renderPodBtg() {
   const section = document.getElementById("podBtgSection");
   if (!trackerData.podFlat.length) return section.innerHTML = emptySection("POD BTG", "Load tracker data to see POD BTG.");
@@ -505,4 +518,23 @@ function resetStartHereFields() {
 
   hideLoadingBar(0);
   setHint("Fields reset. Select a BDM, Team, or Sales Person to begin.");
+}
+
+function updatePrintSelectionSummary() {
+  const bdmEl = document.getElementById("printBdmValue");
+  const teamEl = document.getElementById("printTeamValue");
+  const repEl = document.getElementById("printRepValue");
+  const accountListEl = document.getElementById("printAccountList");
+
+  if (!bdmEl || !teamEl || !repEl || !accountListEl) return;
+
+  bdmEl.textContent = state.bdm || "—";
+  teamEl.textContent = state.team || "—";
+  repEl.textContent = state.rep || "—";
+
+  const selectedAccounts = state.accounts.filter(Boolean);
+
+  accountListEl.innerHTML = selectedAccounts.length
+    ? selectedAccounts.map(account => `<li>${escapeHtml(account)}</li>`).join("")
+    : "<li>—</li>";
 }
