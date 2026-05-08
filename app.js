@@ -38,13 +38,28 @@ function bindEvents() {
   if (bdmSelect) {
     bdmSelect.addEventListener("change", event => {
       state.bdm = event.target.value;
-      state.team = "";
-      state.rep = "";
+  
+      // If the existing Team no longer belongs to this BDM, clear it.
+      if (state.team) {
+        const validTeams = getTeamOptions();
+        if (!validTeams.includes(state.team)) {
+          state.team = "";
+        }
+      }
+  
+      // If the existing Rep no longer belongs to this BDM/Team, clear it.
+      if (state.rep) {
+        const validReps = getRepOptions();
+        if (!validReps.includes(state.rep)) {
+          state.rep = "";
+        }
+      }
+  
       state.accounts = ["", "", "", "", "", ""];
       state.accountBrandGroups = {};
   
       resetTrackerDataOnly();
-      populateAlignmentDropdowns("bdm");
+      populateAlignmentDropdowns();
       renderReport();
     });
   }
@@ -52,15 +67,34 @@ function bindEvents() {
   if (teamSelect) {
     teamSelect.addEventListener("change", event => {
       state.team = event.target.value;
-      state.rep = "";
+  
+      // If existing BDM does not match this Team, clear it.
+      if (state.bdm) {
+        const validBdms = getBdmOptions();
+        if (!validBdms.includes(state.bdm)) {
+          state.bdm = "";
+        }
+      }
+  
+      // If existing Rep does not match this Team/BDM, clear it.
+      if (state.rep) {
+        const validReps = getRepOptions();
+        if (!validReps.includes(state.rep)) {
+          state.rep = "";
+        }
+      }
+  
+      // If Team has only one possible BDM, auto-fill it.
+      const possibleBdms = getBdmOptions();
+      if (!state.bdm && possibleBdms.length === 1) {
+        state.bdm = possibleBdms[0];
+      }
+  
       state.accounts = ["", "", "", "", "", ""];
       state.accountBrandGroups = {};
   
-      // Do not auto-fill BDM from Team alone if multiple BDMs share that Team.
-      resolveBdmFromSelection();
-  
       resetTrackerDataOnly();
-      populateAlignmentDropdowns("team");
+      populateAlignmentDropdowns();
       renderReport();
     });
   }
@@ -68,11 +102,25 @@ function bindEvents() {
   if (repSelect) {
     repSelect.addEventListener("change", event => {
       state.rep = event.target.value;
+  
+      if (state.rep) {
+        const matches = alignmentData.filter(row =>
+          same(getField(row, ["Sales Person"]), state.rep) &&
+          (!state.bdm || same(getField(row, ["BDM"]), state.bdm)) &&
+          (!state.team || same(getField(row, ["Team"]), state.team))
+        );
+  
+        if (matches.length) {
+          state.bdm = getField(matches[0], ["BDM"]);
+          state.team = getField(matches[0], ["Team"]);
+        }
+      }
+  
       state.accounts = ["", "", "", "", "", ""];
       state.accountBrandGroups = {};
+  
       resetTrackerDataOnly();
-      resolveBdmTeamFromRep();
-      populateAlignmentDropdowns("rep");
+      populateAlignmentDropdowns();
       renderReport();
     });
   }
@@ -192,7 +240,7 @@ async function postToAppsScript(payload) {
   catch { throw new Error("Apps Script did not return valid JSON. Check the deployment URL and access permissions."); }
 }
 
-function populateAlignmentDropdowns(changedField = "") {
+function populateAlignmentDropdowns() {
   const bdmOptions = getBdmOptions();
   const teamOptions = getTeamOptions();
   const repOptions = getRepOptions();
@@ -207,6 +255,12 @@ function populateAlignmentDropdowns(changedField = "") {
 function getBdmOptions() {
   let rows = alignmentData;
 
+  if (state.team) {
+    rows = rows.filter(row =>
+      same(getField(row, ["Team"]), state.team)
+    );
+  }
+
   if (state.rep) {
     rows = rows.filter(row =>
       same(getField(row, ["Sales Person"]), state.rep)
@@ -219,6 +273,7 @@ function getBdmOptions() {
       .filter(Boolean)
   );
 }
+
 function getTeamOptions() {
   let rows = alignmentData;
 
@@ -240,6 +295,7 @@ function getTeamOptions() {
       .filter(Boolean)
   );
 }
+
 function getRepOptions() {
   let rows = alignmentData;
 
@@ -261,6 +317,7 @@ function getRepOptions() {
       .filter(Boolean)
   );
 }
+
 function resolveBdmFromTeamIfUnique() {
   if (!state.team) return;
   const matches = alignmentData.filter(row => same(getField(row, ["Team"]), state.team));
