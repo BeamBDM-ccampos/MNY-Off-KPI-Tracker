@@ -12,7 +12,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function bindEvents() {
-  document.getElementById("refreshAlignmentBtn").addEventListener("click", () => loadAlignmentData().catch(err => setStatus("Error refreshing alignment data: " + err.message, true)));
   document.getElementById("loadTrackerBtn").addEventListener("click", () => loadFilteredTrackerData().catch(err => setStatus("Error loading tracker data: " + err.message, true)));
   document.getElementById("refreshTrackerBtn").addEventListener("click", () => loadFilteredTrackerData().catch(err => setStatus("Error refreshing tracker data: " + err.message, true)));
   document.getElementById("printBtn").addEventListener("click", () => window.print());
@@ -72,33 +71,83 @@ async function loadAlignmentData() {
 
 async function loadFilteredTrackerData() {
   const validation = validateSelectionBeforeLoad();
-  if (!validation.ok) { setHint(validation.message, true); throw new Error(validation.message); }
-  setStatus("Loading filtered tracker data...");
-  setHint("Loading filtered tracker data...");
-  const result = await postToAppsScript({ action: "getTrackerData", filters: { bdm: state.bdm, team: state.team, salesPerson: state.rep } });
-  if (!result.success) throw new Error(result.message || "Could not load tracker data.");
 
-  const context = result.context || {};
-  if (context.bdm && !state.bdm) state.bdm = context.bdm;
-  if (context.team && !state.team) state.team = context.team;
-  if (context.salesPerson && !state.rep) state.rep = context.salesPerson;
+  if (!validation.ok) {
+    setHint(validation.message, true);
+    throw new Error(validation.message);
+  }
 
-  trackerData = {
-    podFlat: result.data.POD_Flat || [],
-    podBob: result.data.POD_BOB_MNY || [],
-    displayFlat: result.data.Display_Flat || [],
-    displayBob: result.data.Display_BOB || []
-  };
-  state.accounts = ["", "", "", "", "", ""];
-  state.accountBrandGroups = {};
-  document.getElementById("podRowCount").textContent = trackerData.podFlat.length.toLocaleString();
-  document.getElementById("podBobRowCount").textContent = trackerData.podBob.length.toLocaleString();
-  document.getElementById("displayRowCount").textContent = trackerData.displayFlat.length.toLocaleString();
-  populateAlignmentDropdowns();
-  populateAccountDropdowns();
-  renderReport();
-  setStatus("Filtered tracker data loaded.");
-  setHint("Tracker data loaded. Select up to six accounts.");
+  showLoadingBar("Preparing filters...");
+  updateLoadingBar(10, "Preparing filters...");
+  setHint("Preparing filtered tracker data...");
+
+  try {
+    await wait(250);
+    updateLoadingBar(25, "Connecting to Google Sheets...");
+
+    await wait(250);
+    updateLoadingBar(40, "Filtering tracker rows...");
+
+    const resultPromise = postToAppsScript({
+      action: "getTrackerData",
+      filters: {
+        bdm: state.bdm,
+        team: state.team,
+        salesPerson: state.rep
+      }
+    });
+
+    await wait(350);
+    updateLoadingBar(65, "Loading filtered data...");
+
+    const result = await resultPromise;
+
+    if (!result.success) {
+      throw new Error(result.message || "Could not load tracker data.");
+    }
+
+    updateLoadingBar(80, "Building tracker report...");
+
+    const context = result.context || {};
+
+    if (context.bdm && !state.bdm) state.bdm = context.bdm;
+    if (context.team && !state.team) state.team = context.team;
+    if (context.salesPerson && !state.rep) state.rep = context.salesPerson;
+
+    trackerData = {
+      podFlat: result.data.POD_Flat || [],
+      podBob: result.data.POD_BOB_MNY || [],
+      displayFlat: result.data.Display_Flat || [],
+      displayBob: result.data.Display_BOB || []
+    };
+
+    state.accounts = ["", "", "", "", "", ""];
+    state.accountBrandGroups = {};
+
+    document.getElementById("podRowCount").textContent =
+      trackerData.podFlat.length.toLocaleString();
+
+    document.getElementById("podBobRowCount").textContent =
+      trackerData.podBob.length.toLocaleString();
+
+    document.getElementById("displayRowCount").textContent =
+      trackerData.displayFlat.length.toLocaleString();
+
+    populateAlignmentDropdowns("loaded");
+    populateAccountDropdowns();
+    renderReport();
+
+    updateLoadingBar(100, "Tracker data loaded.");
+    setHint("Tracker data loaded. Select up to six accounts.");
+
+    hideLoadingBar();
+
+  } catch (error) {
+    updateLoadingBar(100, "Something went wrong.");
+    setHint(error.message, true);
+    hideLoadingBar(1500);
+    throw error;
+  }
 }
 
 async function postToAppsScript(payload) {
@@ -252,8 +301,53 @@ function formatNumber(value) { const n = Number(value || 0); return Number.isFin
 function formatPercent(value) { return value === null || value === undefined || value === "" ? "" : Number(value).toLocaleString(undefined, { style: "percent", maximumFractionDigits: 1 }); }
 function formatPodIcon(value) { const n = Number(value || 0); if (n === 1) return "✅"; if (n === 0) return "❌"; return escapeHtml(n); }
 function orderMonths(months) { const order = { JAN:1, JANUARY:1, FEB:2, FEBRUARY:2, MAR:3, MARCH:3, APR:4, APRIL:4, MAY:5, JUN:6, JUNE:6, JUL:7, JULY:7, AUG:8, AUGUST:8, SEP:9, SEPTEMBER:9, OCT:10, OCTOBER:10, NOV:11, NOVEMBER:11, DEC:12, DECEMBER:12 }; return months.sort((a, b) => (order[String(a).trim().toUpperCase()] || 999) - (order[String(b).trim().toUpperCase()] || 999) || String(a).localeCompare(String(b))); }
-function setStatus(message, isError = false) { const el = document.getElementById("uploadStatus"); el.textContent = message; el.style.color = isError ? "var(--danger)" : "var(--muted)"; }
+function setStatus(message, isError = false) {
+  console.log(isError ? "Error:" : "Status:", message);
+}
 function setHint(message, isWarning = false) { const el = document.getElementById("selectionHint"); el.textContent = message; el.classList.toggle("warning", Boolean(isWarning)); }
 function emptySection(title, message) { return `<div class="report-section"><div class="section-title">${escapeHtml(title)}</div><p class="empty">${escapeHtml(message)}</p></div>`; }
 function escapeHtml(value) { return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
 function escapeAttr(value) { return escapeHtml(value); }
+
+function showLoadingBar(message = "Loading tracker data...") {
+  const wrap = document.getElementById("loadingBarWrap");
+  const text = document.getElementById("loadingText");
+  const percent = document.getElementById("loadingPercent");
+  const bar = document.getElementById("loadingBar");
+
+  if (!wrap || !text || !percent || !bar) return;
+
+  wrap.classList.remove("hidden");
+  text.textContent = message;
+  percent.textContent = "0%";
+  bar.style.width = "0%";
+}
+
+function updateLoadingBar(value, message = "") {
+  const text = document.getElementById("loadingText");
+  const percent = document.getElementById("loadingPercent");
+  const bar = document.getElementById("loadingBar");
+
+  if (!text || !percent || !bar) return;
+
+  const safeValue = Math.max(0, Math.min(100, value));
+
+  if (message) text.textContent = message;
+
+  percent.textContent = `${safeValue}%`;
+  bar.style.width = `${safeValue}%`;
+}
+
+function hideLoadingBar(delay = 700) {
+  const wrap = document.getElementById("loadingBarWrap");
+
+  if (!wrap) return;
+
+  setTimeout(() => {
+    wrap.classList.add("hidden");
+  }, delay);
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
