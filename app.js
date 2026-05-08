@@ -42,6 +42,7 @@ function bindEvents() {
       state.rep = "";
       state.accounts = ["", "", "", "", "", ""];
       state.accountBrandGroups = {};
+  
       resetTrackerDataOnly();
       populateAlignmentDropdowns("bdm");
       renderReport();
@@ -54,8 +55,11 @@ function bindEvents() {
       state.rep = "";
       state.accounts = ["", "", "", "", "", ""];
       state.accountBrandGroups = {};
-      resetTrackerDataOnly();
+  
+      // Do not auto-fill BDM from Team alone if multiple BDMs share that Team.
       resolveBdmFromSelection();
+  
+      resetTrackerDataOnly();
       populateAlignmentDropdowns("team");
       renderReport();
     });
@@ -188,29 +192,74 @@ async function postToAppsScript(payload) {
   catch { throw new Error("Apps Script did not return valid JSON. Check the deployment URL and access permissions."); }
 }
 
-function populateAlignmentDropdowns() {
-  fillSelect("bdmSelect", getBdmOptions(), "Select BDM", state.bdm);
-  fillSelect("teamSelect", getTeamOptions(), "Select Team", state.team);
-  fillSelect("repSelect", getRepOptions(), "Select Sales Person", state.rep);
+function populateAlignmentDropdowns(changedField = "") {
+  const bdmOptions = getBdmOptions();
+  const teamOptions = getTeamOptions();
+  const repOptions = getRepOptions();
+
+  fillSelect("bdmSelect", bdmOptions, "Select BDM", state.bdm);
+  fillSelect("teamSelect", teamOptions, "Select Team", state.team);
+  fillSelect("repSelect", repOptions, "Select Sales Person", state.rep);
+
   updateSelectionHint();
 }
+
 function getBdmOptions() {
   let rows = alignmentData;
-  if (state.rep) rows = rows.filter(row => same(getField(row, ["Sales Person"]), state.rep));
-  else if (state.team) rows = rows.filter(row => same(getField(row, ["Team"]), state.team));
-  return uniqueSorted(rows.map(row => getField(row, ["BDM"])).filter(Boolean));
+
+  if (state.rep) {
+    rows = rows.filter(row =>
+      same(getField(row, ["Sales Person"]), state.rep)
+    );
+  }
+
+  return uniqueSorted(
+    rows
+      .map(row => getField(row, ["BDM"]))
+      .filter(Boolean)
+  );
 }
 function getTeamOptions() {
   let rows = alignmentData;
-  if (state.bdm) rows = rows.filter(row => same(getField(row, ["BDM"]), state.bdm));
-  if (state.rep) rows = rows.filter(row => same(getField(row, ["Sales Person"]), state.rep));
-  return uniqueSorted(rows.map(row => getField(row, ["Team"])).filter(Boolean));
+
+  if (state.bdm) {
+    rows = rows.filter(row =>
+      same(getField(row, ["BDM"]), state.bdm)
+    );
+  }
+
+  if (state.rep) {
+    rows = rows.filter(row =>
+      same(getField(row, ["Sales Person"]), state.rep)
+    );
+  }
+
+  return uniqueSorted(
+    rows
+      .map(row => getField(row, ["Team"]))
+      .filter(Boolean)
+  );
 }
 function getRepOptions() {
   let rows = alignmentData;
-  if (state.bdm) rows = rows.filter(row => same(getField(row, ["BDM"]), state.bdm));
-  if (state.team) rows = rows.filter(row => same(getField(row, ["Team"]), state.team));
-  return uniqueSorted(rows.map(row => getField(row, ["Sales Person"])).filter(Boolean));
+
+  if (state.bdm) {
+    rows = rows.filter(row =>
+      same(getField(row, ["BDM"]), state.bdm)
+    );
+  }
+
+  if (state.team) {
+    rows = rows.filter(row =>
+      same(getField(row, ["Team"]), state.team)
+    );
+  }
+
+  return uniqueSorted(
+    rows
+      .map(row => getField(row, ["Sales Person"]))
+      .filter(Boolean)
+  );
 }
 function resolveBdmFromTeamIfUnique() {
   if (!state.team) return;
