@@ -1029,3 +1029,61 @@ th.numeric {
     break-inside: avoid !important;
   }
 }
+
+.bdm-bulk-email-box {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.bdm-bulk-email-box.hidden {
+  display: none;
+}
+
+.bdm-bulk-email-box h3 {
+  color: var(--gold-dark);
+  margin-bottom: 6px;
+}
+
+.bdm-bulk-email-box p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.bulk-email-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.bulk-email-grid label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--gold-dark);
+}
+
+.bulk-email-grid input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--white);
+  font: inherit;
+  color: var(--ink);
+}
+
+@media (max-width: 700px) {
+  .bulk-email-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-email-grid button {
+    width: 100%;
+  }
+}
