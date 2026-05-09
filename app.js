@@ -21,6 +21,15 @@ function bindEvents() {
   const teamSelect = document.getElementById("teamSelect");
   const repSelect = document.getElementById("repSelect");
   const resetFieldsBtn = document.getElementById("resetFieldsBtn");
+  const sendBdmReportsBtn = document.getElementById("sendBdmReportsBtn");
+
+  if (sendBdmReportsBtn) {
+    sendBdmReportsBtn.addEventListener("click", () => {
+      sendBdmRepReports().catch(error => {
+        setBdmEmailStatus("Error: " + error.message, true);
+      });
+    });
+  }
 
   if (resetFieldsBtn) {
     resetFieldsBtn.addEventListener("click", () => {
@@ -378,6 +387,7 @@ function renderReport() {
   renderAccountBreakdowns();
   renderDisplayAccountDetails();
   updatePrintSelectionSummary();
+  updateBdmBulkEmailBox();
 }
 
 function renderPodBtg() {
@@ -537,4 +547,74 @@ function updatePrintSelectionSummary() {
   accountListEl.innerHTML = selectedAccounts.length
     ? selectedAccounts.map(account => `<li>${escapeHtml(account)}</li>`).join("")
     : "<li>—</li>";
+}
+
+function updateBdmBulkEmailBox() {
+  const box = document.getElementById("bdmBulkEmailBox");
+
+  if (!box) return;
+
+  const shouldShow =
+    Boolean(state.bdm) &&
+    !state.team &&
+    !state.rep;
+
+  box.classList.toggle("hidden", !shouldShow);
+}
+
+function setBdmEmailStatus(message, isError = false) {
+  const el = document.getElementById("bdmEmailStatus");
+
+  if (!el) return;
+
+  el.textContent = message;
+  el.style.color = isError ? "var(--danger)" : "var(--muted)";
+}
+
+async function sendBdmRepReports() {
+  const emailInput = document.getElementById("bdmReportEmail");
+  const sendBtn = document.getElementById("sendBdmReportsBtn");
+
+  const email = emailInput ? emailInput.value.trim() : "";
+
+  if (!state.bdm || state.team || state.rep) {
+    throw new Error("Select only a BDM before sending bulk rep reports.");
+  }
+
+  if (!email) {
+    throw new Error("Please enter a recipient email.");
+  }
+
+  if (!email.includes("@")) {
+    throw new Error("Please enter a valid email address.");
+  }
+
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending...";
+  }
+
+  setBdmEmailStatus("Generating PDFs and sending email. This may take a minute...");
+
+  try {
+    const result = await postToAppsScript({
+      action: "emailBdmRepReports",
+      bdm: state.bdm,
+      email
+    });
+
+    if (!result.success) {
+      throw new Error(result.message || "Could not send BDM reports.");
+    }
+
+    setBdmEmailStatus(
+      `Email sent to ${email} with ${result.pdfCount || 0} PDF report(s).`
+    );
+
+  } finally {
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = "Send BDM Reports";
+    }
+  }
 }
