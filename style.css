@@ -359,6 +359,11 @@ th.numeric {
   flex: 0 0 auto;
 }
 
+.subtitle strong {
+  color: var(--gold-dark);
+  font-weight: 900;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
