@@ -41,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
   buildAccountSelectors();
   bindEvents();
   resetTrackerViews();
+  updateModeLabels();
   loadAlignmentData().catch(err => setStatus("Error loading alignment data: " + err.message, true));
 });
 
@@ -55,6 +56,17 @@ function bindEvents() {
   const repSelect = document.getElementById("repSelect");
   const resetFieldsBtn = document.getElementById("resetFieldsBtn");
   const sendBdmReportsBtn = document.getElementById("sendBdmReportsBtn");
+
+  const offModeBtn = document.getElementById("offModeBtn");
+  const onModeBtn = document.getElementById("onModeBtn");
+  
+  if (offModeBtn) {
+    offModeBtn.addEventListener("click", () => switchMode("off"));
+  }
+  
+  if (onModeBtn) {
+    onModeBtn.addEventListener("click", () => switchMode("on"));
+  }
 
   if (sendBdmReportsBtn) {
     sendBdmReportsBtn.addEventListener("click", () => {
@@ -530,8 +542,86 @@ function bindBrandGroupDropdowns() { document.querySelectorAll(".brand-group-sel
 function renderDisplayAccountDetails() {
   const section = document.getElementById("displayAccountSection");
   const accounts = state.accounts.filter(Boolean);
-  if (!trackerData.displayBob.length || !accounts.length) return section.innerHTML = "";
-  section.innerHTML = `<div class="report-section"><div class="section-title">Account Display Details</div>${accounts.map(renderDisplayAccountTable).join("")}</div>`;
+  const config = MODE_CONFIG[state.mode];
+
+  if (!trackerData.displayBob.length || !accounts.length) {
+    section.innerHTML = "";
+    return;
+  }
+
+  section.innerHTML = `
+    <div class="report-section">
+      <div class="section-title">${escapeHtml(config.secondaryDetailLabel)}</div>
+      ${
+        config.secondaryDetailType === "monthly"
+          ? accounts.map(account => renderDisplayAccountTable(account)).join("")
+          : accounts.map(account => renderMenuAccountTable(account)).join("")
+      }
+    </div>
+  `;
+}
+
+function renderMenuAccountTable(account) {
+  const accountRows = trackerData.displayBob.filter(row =>
+    same(getField(row, ["Customer"]), account)
+  );
+
+  if (!accountRows.length) {
+    return `
+      <div class="account-card">
+        <h3>${escapeHtml(account)} Menu Details</h3>
+        <p class="empty">No menu detail found for this account.</p>
+      </div>
+    `;
+  }
+
+  const brandFamilies = uniqueSorted(
+    accountRows
+      .map(row => getField(row, ["Brand Goal Group"]))
+      .filter(Boolean)
+  );
+
+  const rows = brandFamilies.map(brandFamily => {
+    const matchingRows = accountRows.filter(row =>
+      same(getField(row, ["Brand Goal Group"]), brandFamily)
+    );
+
+    const finalPoes = matchingRows.reduce((total, row) => {
+      const value = Number(getField(row, ["Final POEs"]) || 0);
+      return total + (Number.isFinite(value) ? value : 0);
+    }, 0);
+
+    return {
+      brandFamily,
+      captured: finalPoes > 0
+    };
+  });
+
+  return `
+    <div class="account-card">
+      <h3>${escapeHtml(account)} Menu Details</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Brand Family</th>
+              <th class="numeric">Captured</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td>${escapeHtml(row.brandFamily)}</td>
+                <td class="numeric">${row.captured ? "✅" : "❌"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 function renderDisplayAccountTable(account) {
   const accountRows = trackerData.displayBob.filter(row => same(getField(row, ["Customer"]), account));
@@ -720,5 +810,53 @@ async function sendBdmRepReports() {
       sendBtn.disabled = false;
       sendBtn.textContent = "Send BDM Reports";
     }
+  }
+}
+
+function switchMode(mode) {
+  if (!MODE_CONFIG[mode] || state.mode === mode) return;
+
+  state.mode = mode;
+  state.bdm = "";
+  state.team = "";
+  state.rep = "";
+  state.accounts = ["", "", "", "", "", ""];
+  state.accountBrandGroups = {};
+
+  alignmentData = [];
+
+  trackerData = {
+    podBtg: [],
+    displayBtg: [],
+    podBob: [],
+    displayBob: []
+  };
+
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  });
+
+  updateModeLabels();
+  populateAccountDropdowns();
+  renderReport();
+
+  loadAlignmentData().catch(err =>
+    setStatus("Error loading alignment data: " + err.message, true)
+  );
+}
+
+function updateModeLabels() {
+  const config = MODE_CONFIG[state.mode];
+
+  const title = document.querySelector(".hero h1");
+  const subtitle = document.querySelector(".subtitle");
+
+  if (title) {
+    title.textContent = `${config.label} Tracker`;
+  }
+
+  if (subtitle) {
+    subtitle.textContent =
+      `Start by selecting a BDM, Team, or Sales Person. ${config.secondaryLabel} data loads only after your selection, so the page stays fast.`;
   }
 }
