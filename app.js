@@ -1,7 +1,7 @@
 const MODE_CONFIG = {
   off: {
     label: "Off Premise",
-    scriptUrl: "https://script.google.com/macros/s/AKfycbyIHdknTaHa-QdlLRrdZfjhHQvhd1z-h1KeQQHGkS4P9oG93euOQmkXpNwiBU1b69jB/exec",
+    scriptUrl: "https://script.google.com/macros/s/AKfycby4toPxyv_g9qYS3d2TkVLzkbTMgHoviZ9rl96LlLXnntW8Wh86hkWWvWhXM6YYyACZ/exec",
     secondaryLabel: "Display",
     secondaryDetailLabel: "Account Display Details",
     secondaryDetailType: "monthly"
@@ -9,7 +9,7 @@ const MODE_CONFIG = {
 
   on: {
     label: "On Premise",
-    scriptUrl: "https://script.google.com/macros/s/AKfycbwhX1noXoFrY5NHtkWgtFxfpp3DuAvO1Frdejg7hKLlZOl2-F8oidjDicpiMzMX-STLKw/exec",
+    scriptUrl: "https://script.google.com/macros/s/AKfycbzISE7lIuGu11Td8eFLrq77e_ljbsfwjtCz-Y_QL_Tr07LHgd33qLoNfitm1xKi6kOrMw/exec",
     secondaryLabel: "Menu",
     secondaryDetailLabel: "Account Menu Details",
     secondaryDetailType: "captured"
@@ -34,7 +34,8 @@ const state = {
   team: "",
   rep: "",
   accounts: ["", "", "", "", "", ""],
-  accountBrandGroups: {}
+  accountBrandGroups: {},
+  spreadsheetLastUpdated: ""
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -844,6 +845,7 @@ function switchMode(mode) {
   state.rep = "";
   state.accounts = ["", "", "", "", "", ""];
   state.accountBrandGroups = {};
+  state.spreadsheetLastUpdated = "";
 
   alignmentData = [];
 
@@ -875,6 +877,7 @@ function switchMode(mode) {
 function updateModeLabels() {
   const config = MODE_CONFIG[state.mode];
   const trackerName = `MNY BDM Tracker ${config.label}`;
+  const updateDate = state.spreadsheetLastUpdated || "Loading...";
 
   const title = document.querySelector(".hero h1");
   const subtitle = document.querySelector(".subtitle");
@@ -889,8 +892,10 @@ function updateModeLabels() {
   }
 
   if (subtitle) {
-    const updateDate = state.spreadsheetLastUpdated || "Unavailable";
-    subtitle.innerHTML = `Updated with Info Extracted on: <strong>${escapeHtml(updateDate)}</strong>`;
+    subtitle.innerHTML = `
+      Start by selecting a BDM, Team, or Sales Person. Then Load Tracker Data to access account names.<br>
+      Updated with Info Extracted on: <strong>${escapeHtml(updateDate)}</strong>
+    `;
   }
 
   if (trackerReportTitle) {
