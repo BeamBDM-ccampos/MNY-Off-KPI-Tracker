@@ -1,7 +1,12 @@
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmY2DpCDoEI1i9d0CsQYfyoRxeg6vWy4571R_V1jD0Ta0tZPd-f5au2lwlzx132GU0/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw-1pq4at34W6JRDkrRsraNeXEHpvTQCKfst8fFx0OpR-Bu_DDGh1lwae-wVELOeJhL/exec";
 
 let alignmentData = [];
-let trackerData = { podFlat: [], podBob: [], displayFlat: [], displayBob: [] };
+let trackerData = {
+  podBtg: [],
+  displayBtg: [],
+  podBob: [],
+  displayBob: []
+};
 const state = { bdm: "", team: "", rep: "", accounts: ["", "", "", "", "", ""], accountBrandGroups: {} };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -219,9 +224,9 @@ async function loadFilteredTrackerData() {
     if (context.salesPerson && !state.rep) state.rep = context.salesPerson;
 
     trackerData = {
-      podFlat: result.data.POD_Flat || [],
+      podBtg: result.summary?.podBtg || [],
+      displayBtg: result.summary?.displayBtg || [],
       podBob: result.data.POD_BOB_MNY || [],
-      displayFlat: result.data.Display_Flat || [],
       displayBob: result.data.Display_BOB || []
     };
 
@@ -392,28 +397,82 @@ function renderReport() {
 
 function renderPodBtg() {
   const section = document.getElementById("podBtgSection");
-  if (!trackerData.podFlat.length) return section.innerHTML = emptySection("POD BTG", "Load tracker data to see POD BTG.");
-  const brands = uniqueSorted(trackerData.podFlat.filter(row => isOffPremise(getField(row, ["Premise"]))).map(row => getField(row, ["Brand"])).filter(Boolean));
-  const rows = brands.map(brand => {
-    const selectedRows = trackerData.podFlat.filter(row => isOffPremise(getField(row, ["Premise"])) && (!state.rep || same(getField(row, ["Sales Person"]), state.rep)) && same(getField(row, ["Brand"]), brand));
-    const teamRows = trackerData.podFlat.filter(row => isOffPremise(getField(row, ["Premise"])) && (!state.team || same(getField(row, ["Team"]), state.team)) && same(getField(row, ["Brand"]), brand));
-    const selectedActual = sum(selectedRows, ["POD Act"]), selectedGoal = sum(selectedRows, ["POD Goal"]), teamActual = sum(teamRows, ["POD Act"]), teamGoal = sum(teamRows, ["POD Goal"]);
-    return { brand, selectedBtg: selectedActual - selectedGoal, selectedAch: percent(selectedActual, selectedGoal), teamBtg: teamActual - teamGoal, teamAch: percent(teamActual, teamGoal) };
-  });
-  section.innerHTML = `<div class="report-section"><div class="section-title">POD BTG</div><div class="table-wrap"><table><thead><tr><th>Brand</th><th class="numeric">Selection BTG</th><th class="numeric">Selection % Ach</th><th class="numeric">Team BTG</th><th class="numeric">Team % Ach</th></tr></thead><tbody>${rows.map(row => `<tr><td>${escapeHtml(row.brand)}</td><td class="numeric ${row.selectedBtg < 0 ? "bad" : "good"}">${formatNumber(row.selectedBtg)}</td><td class="numeric">${formatPercent(row.selectedAch)}</td><td class="numeric ${row.teamBtg < 0 ? "bad" : "good"}">${formatNumber(row.teamBtg)}</td><td class="numeric">${formatPercent(row.teamAch)}</td></tr>`).join("")}</tbody></table></div></div>`;
+
+  if (!trackerData.podBtg.length) {
+    section.innerHTML = emptySection("POD BTG", "Load tracker data to see POD BTG.");
+    return;
+  }
+
+  section.innerHTML = `
+    <div class="report-section">
+      <div class="section-title">POD BTG</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Brand</th>
+              <th class="numeric">Selection BTG</th>
+              <th class="numeric">Selection % Ach</th>
+              <th class="numeric">Team BTG</th>
+              <th class="numeric">Team % Ach</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trackerData.podBtg.map(row => `
+              <tr>
+                <td>${escapeHtml(row.brand)}</td>
+                <td class="numeric ${Number(row.selectionBtg) < 0 ? "bad" : "good"}">${formatNumber(row.selectionBtg)}</td>
+                <td class="numeric">${formatPercent(row.selectionAch)}</td>
+                <td class="numeric ${Number(row.teamBtg) < 0 ? "bad" : "good"}">${formatNumber(row.teamBtg)}</td>
+                <td class="numeric">${formatPercent(row.teamAch)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
+
 function renderDisplayBtg() {
   const section = document.getElementById("displayBtgSection");
-  if (!trackerData.displayFlat.length) return section.innerHTML = emptySection("Display BTG", "Load tracker data to see Display BTG.");
-  const brands = uniqueSorted(trackerData.displayFlat.filter(row => isOffPremise(getField(row, ["Premise"]))).map(row => getField(row, ["Brand"])).filter(Boolean));
-  const rows = brands.map(brand => {
-    const selectedRows = trackerData.displayFlat.filter(row => isOffPremise(getField(row, ["Premise"])) && (!state.rep || same(getField(row, ["Sales Person"]), state.rep)) && same(getField(row, ["Brand"]), brand));
-    const teamRows = trackerData.displayFlat.filter(row => isOffPremise(getField(row, ["Premise"])) && (!state.team || same(getField(row, ["Team"]), state.team)) && same(getField(row, ["Brand"]), brand));
-    const selectedActual = sum(selectedRows, ["Display Act"]), selectedGoal = sum(selectedRows, ["Display Goal"]), teamActual = sum(teamRows, ["Display Act"]), teamGoal = sum(teamRows, ["Display Goal"]);
-    return { brand, selectedBtg: selectedActual - selectedGoal, selectedAch: percent(selectedActual, selectedGoal), teamBtg: teamActual - teamGoal, teamAch: percent(teamActual, teamGoal) };
-  });
-  section.innerHTML = `<div class="report-section"><div class="section-title">Display BTG</div><div class="table-wrap"><table><thead><tr><th>Brand</th><th class="numeric">Selection BTG</th><th class="numeric">Selection % Ach</th><th class="numeric">Team BTG</th><th class="numeric">Team % Ach</th></tr></thead><tbody>${rows.map(row => `<tr><td>${escapeHtml(row.brand)}</td><td class="numeric ${row.selectedBtg < 0 ? "bad" : "good"}">${formatNumber(row.selectedBtg)}</td><td class="numeric">${formatPercent(row.selectedAch)}</td><td class="numeric ${row.teamBtg < 0 ? "bad" : "good"}">${formatNumber(row.teamBtg)}</td><td class="numeric">${formatPercent(row.teamAch)}</td></tr>`).join("")}</tbody></table></div></div>`;
+
+  if (!trackerData.displayBtg.length) {
+    section.innerHTML = emptySection("Display BTG", "Load tracker data to see Display BTG.");
+    return;
+  }
+
+  section.innerHTML = `
+    <div class="report-section">
+      <div class="section-title">Display BTG</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Brand</th>
+              <th class="numeric">Selection BTG</th>
+              <th class="numeric">Selection % Ach</th>
+              <th class="numeric">Team BTG</th>
+              <th class="numeric">Team % Ach</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trackerData.displayBtg.map(row => `
+              <tr>
+                <td>${escapeHtml(row.brand)}</td>
+                <td class="numeric ${Number(row.selectionBtg) < 0 ? "bad" : "good"}">${formatNumber(row.selectionBtg)}</td>
+                <td class="numeric">${formatPercent(row.selectionAch)}</td>
+                <td class="numeric ${Number(row.teamBtg) < 0 ? "bad" : "good"}">${formatNumber(row.teamBtg)}</td>
+                <td class="numeric">${formatPercent(row.teamAch)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
+
 function renderAccountBreakdowns() {
   const section = document.getElementById("accountBreakdownSection");
   const accounts = state.accounts.filter(Boolean);
@@ -447,7 +506,16 @@ function renderDisplayAccountTable(account) {
   return `<div class="account-card"><h3>${escapeHtml(account)} Display Details</h3><div class="table-wrap"><table><thead><tr><th>Brand Family</th>${months.map(month => `<th>${escapeHtml(month)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr><td>${escapeHtml(row.family)}</td>${row.statuses.map(status => `<td>${status === "Yes" ? '<span class="yes-pill">Yes</span>' : '<span class="no-pill">No</span>'}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
 }
 function clearAccountsAndData() { state.accounts = ["", "", "", "", "", ""]; state.accountBrandGroups = {}; resetTrackerDataOnly(); }
-function resetTrackerDataOnly() { trackerData = { podFlat: [], podBob: [], displayFlat: [], displayBob: [] }; populateAccountDropdowns(); }
+function resetTrackerDataOnly() {
+  trackerData = {
+    podBtg: [],
+    displayBtg: [],
+    podBob: [],
+    displayBob: []
+  };
+
+  populateAccountDropdowns();
+}
 function resetTrackerViews() { resetTrackerDataOnly(); renderReport(); }
 function fillSelect(id, values, placeholder, selectedValue) { const select = document.getElementById(id); select.innerHTML = `<option value="">${placeholder}</option>` + values.map(value => `<option value="${escapeAttr(value)}">${escapeHtml(value)}</option>`).join(""); if (selectedValue && values.includes(selectedValue)) select.value = selectedValue; }
 function getField(row, candidates) { const keys = Object.keys(row || {}); const map = new Map(keys.map(key => [normalizeKey(key), key])); for (const candidate of candidates) { const key = map.get(normalizeKey(candidate)); if (key !== undefined) { const value = row[key]; return typeof value === "string" ? value.trim() : value; } } return ""; }
